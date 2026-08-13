@@ -33,9 +33,6 @@ async def async_get_config_entry_diagnostics(
                 _updater.client.diagnostics, TO_REDACT
             )
 
-        if hasattr(_updater, "buttons") and _updater.buttons:
-            _data["buttons"] = list(_updater.buttons.keys())
-
         if hasattr(_updater, "devices") and _updater.devices:
             _data["devices"] = list(_updater.devices.keys())
 

@@ -8,17 +8,18 @@ from homeassistant.const import Platform
 # fmt: off
 DOMAIN: Final = "ledfx"
 NAME: Final = "LedFx"
-MAINTAINER: Final = "LedFx Developers"
+SERVICE_MANUFACTURER: Final = "Yeon"
+SERVICE_MODEL: Final = "BladeMOD"
 ATTRIBUTION: Final = "Data provided by LedFx"
 
 PLATFORMS: Final = [
     Platform.BINARY_SENSOR,
     Platform.SENSOR,
     Platform.LIGHT,
-    Platform.BUTTON,
     Platform.SWITCH,
     Platform.NUMBER,
     Platform.SELECT,
+    Platform.TEXT,
 ]
 
 """Diagnostic const"""
@@ -29,12 +30,12 @@ DIAGNOSTIC_CONTENT: Final = "content"
 """Helper const"""
 UPDATER: Final = "updater"
 UPDATE_LISTENER: Final = "update_listener"
-SIGNAL_NEW_BUTTON: Final = f"{DOMAIN}-new-button"
 SIGNAL_NEW_DEVICE: Final = f"{DOMAIN}-new-device"
 SIGNAL_NEW_NUMBER: Final = f"{DOMAIN}-new-number"
 SIGNAL_NEW_SELECT: Final = f"{DOMAIN}-new-select"
 SIGNAL_NEW_SENSOR: Final = f"{DOMAIN}-new-sensor"
 SIGNAL_NEW_SWITCH: Final = f"{DOMAIN}-new-switch"
+SIGNAL_NEW_TEXT: Final = f"{DOMAIN}-new-text"
 OPTION_IS_FROM_FLOW: Final = "is_from_flow"
 
 """Custom conf"""
@@ -44,8 +45,6 @@ CONF_BASIC_AUTH: Final = "basic_auth"
 DEFAULT_SCAN_INTERVAL: Final = 7
 DEFAULT_TIMEOUT: Final = 10
 DEFAULT_POST_TIMEOUT: Final = 60
-DEFAULT_CALL_DELAY: Final = 1
-DEFAULT_SLEEP: Final = 3
 
 """LedFx API client const"""
 CLIENT_URL: Final = "http://{ip}:{port}/api"
@@ -55,6 +54,19 @@ ATTR_STATE: Final = "state"
 ATTR_STATE_NAME: Final = "State"
 ATTR_DEVICE: Final = "device"
 ATTR_DEVICE_SW_VERSION: Final = "device_sw_version"
+
+"""Diagnostic attributes"""
+ATTR_DIAG_CONFIGURATION_VERSION: Final = "configuration_version"
+ATTR_DIAG_GITHUB_SHA: Final = "github_sha"
+ATTR_DIAG_RELEASE_BUILD: Final = "release_build"
+ATTR_DIAG_DEVELOPER_MODE: Final = "developer_mode"
+ATTR_DIAG_SENDSPIN_AVAILABLE: Final = "sendspin_available"
+ATTR_DIAG_PHYSICAL_DEVICES: Final = "physical_devices"
+ATTR_DIAG_ONLINE_DEVICES: Final = "online_devices"
+ATTR_DIAG_VIRTUALS: Final = "virtuals_count"
+ATTR_DIAG_ACTIVE_VIRTUALS: Final = "active_virtuals"
+ATTR_DIAG_STREAMING_VIRTUALS: Final = "streaming_virtuals"
+ATTR_DIAG_SCAN_INTERVAL: Final = "scan_interval"
 ATTR_FIELD: Final = "field"
 ATTR_FIELD_TYPE: Final = "type"
 ATTR_FIELD_EFFECTS: Final = "effects"
@@ -64,6 +76,13 @@ ATTR_FIELD_OPTIONS: Final = "options"
 ATTR_SELECT_AUDIO_INPUT: Final = "audio_input"
 ATTR_SELECT_AUDIO_INPUT_NAME: Final = "Audio input"
 ATTR_SELECT_AUDIO_INPUT_OPTIONS: Final = "audio_input_options"
+ATTR_SELECT_DEVICE_PRESET: Final = "preset"
+ATTR_SELECT_DEVICE_PRESET_NAME: Final = "Preset"
+ATTR_SELECT_DEVICE_EFFECT: Final = "effect"
+ATTR_SELECT_DEVICE_EFFECT_NAME: Final = "Effect"
+# Synthetic first option of the preset select: re-applies the current effect
+# with its default config when no dedicated reset preset exists.
+ATTR_PRESET_DEFAULT: Final = "Default"
 
 """Light attributes"""
 ATTR_LIGHT_STATE: Final = "state"
@@ -75,6 +94,7 @@ ATTR_LIGHT_EFFECT_CONFIG: Final = "effect_config"
 ATTR_LIGHT_EFFECTS: Final = "effects"
 ATTR_LIGHT_DEFAULT_PRESETS: Final = "default_presets"
 ATTR_LIGHT_CUSTOM_PRESETS: Final = "custom_presets"
+ATTR_LIGHT_ACTIVE_PRESET: Final = "active_preset"
 
 """Icons"""
 SENSOR_ICONS: Final = {

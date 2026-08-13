@@ -11,11 +11,9 @@ from homeassistant.components.light import (
     ATTR_EFFECT,
     ATTR_RGBW_COLOR,
     ENTITY_ID_FORMAT,
-    SUPPORT_BRIGHTNESS,
-    SUPPORT_COLOR,
-    SUPPORT_EFFECT,
     ColorMode,
     LightEntity,
+    LightEntityFeature,
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import STATE_OFF, STATE_ON
@@ -38,7 +36,7 @@ from .const import (
 )
 from .entity import LedFxEntity
 from .enum import ActionType, EffectCategory, Version
-from .helper import build_effects, find_effect, hex_to_rgbw, rgbw_to_hex
+from .helper import find_effect, hex_to_rgbw, rgbw_to_hex
 from .updater import (
     LedFxEntityDescription,
     LedFxUpdater,
@@ -118,11 +116,10 @@ class LedFxLight(LedFxEntity, LightEntity):
 
         self._attr_device_info = entity.device_info
 
-        self._attr_supported_features = SUPPORT_EFFECT | SUPPORT_BRIGHTNESS
+        self._attr_supported_features = LightEntityFeature.EFFECT
 
         if updater.version == Version.V2:
-            self._attr_supported_features |= SUPPORT_COLOR
-            self._attr_supported_color_modes = {ColorMode.RGBW, ColorMode.ONOFF}
+            self._attr_supported_color_modes = {ColorMode.RGBW}
             self._attr_color_mode = ColorMode.RGBW
 
         self._attr_is_on = updater.data.get(
@@ -137,11 +134,10 @@ class LedFxLight(LedFxEntity, LightEntity):
             updater.data.get(f"{self._attr_device_code}_{ATTR_LIGHT_COLOR}", None)
         )
 
-        self._attr_effect_list = build_effects(
-            updater.data.get(ATTR_LIGHT_EFFECTS, []),
-            updater.data.get(ATTR_LIGHT_DEFAULT_PRESETS, {}),
-            updater.data.get(ATTR_LIGHT_CUSTOM_PRESETS, {}),
-        )
+        # Presets are exposed through a dedicated per-device "Preset" select; the
+        # effect list holds base effects only so the selection round-trips (the
+        # backend reports the effect type, never the active preset).
+        self._attr_effect_list = list(updater.data.get(ATTR_LIGHT_EFFECTS, []))
         self._attr_effect = updater.data.get(
             f"{self._attr_device_code}_{ATTR_LIGHT_EFFECT}"
         )
@@ -167,11 +163,7 @@ class LedFxLight(LedFxEntity, LightEntity):
             self._updater.data.get(f"{self._attr_device_code}_{ATTR_LIGHT_COLOR}", None)
         )
 
-        effect_list = build_effects(
-            self._updater.data.get(ATTR_LIGHT_EFFECTS, []),
-            self._updater.data.get(ATTR_LIGHT_DEFAULT_PRESETS, {}),
-            self._updater.data.get(ATTR_LIGHT_CUSTOM_PRESETS, {}),
-        )
+        effect_list = list(self._updater.data.get(ATTR_LIGHT_EFFECTS, []))
         effect: str | None = self._updater.data.get(
             f"{self._attr_device_code}_{ATTR_LIGHT_EFFECT}"
         )
@@ -222,7 +214,22 @@ class LedFxLight(LedFxEntity, LightEntity):
                 self._updater.data.get(ATTR_LIGHT_CUSTOM_PRESETS, []),
             )
 
-        if (
+        # LedFx 2.x keeps a virtual's active/inactive output state separate
+        # from its effect.  A normal HA off/on must therefore only toggle the
+        # virtual's ``active`` flag.  Re-POSTing the effect here rebuilds it
+        # from defaults and can replace the user's active preset.
+        normal_v2_resume = (
+            is_virtual
+            and not self._attr_is_on
+            and ATTR_EFFECT not in kwargs
+            and preset is None
+        )
+
+        if normal_v2_resume:
+            await self._updater.client.set_virtual_active(
+                self._attr_device_code, True  # type: ignore[arg-type]
+            )
+        elif (
             self._attr_effect != old_effect
             or not self._attr_is_on
             or preset is not None
@@ -279,9 +286,18 @@ class LedFxLight(LedFxEntity, LightEntity):
         :param kwargs: Any: Any arguments
         """
 
-        await self._updater.client.device_off(
-            self._attr_device_code, self._updater.version == Version.V2  # type: ignore
-        )
+        if self._updater.version == Version.V2:
+            # Do not DELETE /effects here.  That clears the active effect and
+            # loses preset identity.  In LedFx 2.x, stopping output is a
+            # virtual active-state operation and preserves the complete effect
+            # configuration for the next start.
+            await self._updater.client.set_virtual_active(
+                self._attr_device_code, False  # type: ignore[arg-type]
+            )
+        else:
+            await self._updater.client.device_off(
+                self._attr_device_code, False  # type: ignore[arg-type]
+            )
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn on action

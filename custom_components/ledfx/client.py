@@ -120,7 +120,7 @@ class LedFxClient:
         ):  # pragma: no cover
             self._debug("Invalid status received", _url, _data, path)
 
-            raise LedFxRequestError("Request error")
+            raise LedFxRequestError(self._request_error_message(path, _data))
 
         if (isinstance(validate_field, str) and validate_field not in _data) or (
             isinstance(validate_field, tuple)
@@ -128,7 +128,7 @@ class LedFxClient:
         ):  # pragma: no cover
             self._debug("Invalid response received", _url, _data, path)
 
-            raise LedFxRequestError("Request error")
+            raise LedFxRequestError(self._request_error_message(path, _data))
 
         return _data
 
@@ -155,14 +155,6 @@ class LedFxClient:
         """
 
         return await self.request("virtuals")
-
-    async def scenes(self) -> dict:
-        """scenes method.
-
-        :return dict: dict with api data.
-        """
-
-        return await self.request("scenes")
 
     async def audio_devices(self) -> dict:
         """audio/devices method.
@@ -198,6 +190,19 @@ class LedFxClient:
 
         return await self.request("colors", validate_field="colors")
 
+    async def set_virtual_active(self, virtual_id: str, active: bool) -> dict:
+        """Set a LedFx virtual active/inactive without clearing its effect.
+
+        LedFx 2.x exposes virtual output state separately from the active
+        effect.  Using this endpoint preserves the effect configuration and
+        therefore the active preset across normal Home Assistant off/on
+        cycles.
+        """
+
+        return await self.request(
+            f"virtuals/{virtual_id}", Method.PUT, {"active": bool(active)}
+        )
+
     async def device_on(
         self, device_code: str, effect: str, is_virtual: bool = False
     ) -> dict:
@@ -228,6 +233,18 @@ class LedFxClient:
         prefix: str = "virtuals" if is_virtual else "devices"
 
         return await self.request(f"{prefix}/{device_code}/effects", Method.DELETE)
+
+    async def virtual_presets(self, virtual_id: str) -> dict:
+        """Return presets for the virtual's currently active effect.
+
+        LedFx 2.1.9 exposes the authoritative preset IDs and display names at
+        ``GET /api/virtuals/{virtual_id}/presets``.  Using this endpoint at
+        selection time avoids stale/global config mappings, especially for
+        non-Latin user preset names whose generated IDs may differ radically
+        from their visible names.
+        """
+
+        return await self.request(f"virtuals/{virtual_id}/presets")
 
     async def preset(
         self,
@@ -290,16 +307,32 @@ class LedFxClient:
 
         return await self.request("audio/devices", Method.PUT, {"index": index})
 
-    async def run_scene(self, scene_id: str) -> dict:
-        """scenes run method.
-
-        :param scene_id: str: scene id
-        :return dict: dict with api data.
+    async def toggle_play_pause(self) -> None:
+        """toggle play/pause method.
         """
 
-        return await self.request(
-            "scenes", Method.PUT, {"action": "activate", "id": scene_id}
-        )
+        return await self.request("virtuals", Method.PUT)
+
+    @staticmethod
+    def _request_error_message(path: str, data: dict) -> str:
+        """Build an informative LedFx API error message."""
+
+        candidates: list[Any] = [
+            data.get("message"),
+            data.get("reason"),
+            data.get("error"),
+        ]
+
+        payload = data.get("payload")
+        if isinstance(payload, dict):
+            candidates.extend(
+                [payload.get("message"), payload.get("reason"), payload.get("error")]
+            )
+        elif payload:
+            candidates.append(payload)
+
+        detail = next((str(value) for value in candidates if value), None)
+        return f"LedFx API request '{path}' failed{': ' + detail if detail else ''}"
 
     def _debug(self, message: str, url: str, content: Any, path: str) -> None:
         """Debug log

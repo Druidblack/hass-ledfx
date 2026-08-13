@@ -16,7 +16,13 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import ATTR_STATE, ATTR_STATE_NAME
+from .const import (
+    ATTR_DIAG_DEVELOPER_MODE,
+    ATTR_DIAG_RELEASE_BUILD,
+    ATTR_DIAG_SENDSPIN_AVAILABLE,
+    ATTR_STATE,
+    ATTR_STATE_NAME,
+)
 from .entity import LedFxEntity
 from .updater import LedFxUpdater, async_get_updater
 
@@ -34,6 +40,27 @@ BINARY_SENSORS: tuple[BinarySensorEntityDescription, ...] = (
         icon=ICONS[f"{ATTR_STATE}_{STATE_ON}"],
         entity_category=EntityCategory.DIAGNOSTIC,
         entity_registry_enabled_default=True,
+    ),
+    BinarySensorEntityDescription(
+        key=ATTR_DIAG_RELEASE_BUILD,
+        name="Release build",
+        icon="mdi:package-variant-closed-check",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+    ),
+    BinarySensorEntityDescription(
+        key=ATTR_DIAG_DEVELOPER_MODE,
+        name="Developer mode",
+        icon="mdi:code-tags",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+    ),
+    BinarySensorEntityDescription(
+        key=ATTR_DIAG_SENDSPIN_AVAILABLE,
+        name="SendSpin available",
+        icon="mdi:music-circle-outline",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
     ),
 )
 

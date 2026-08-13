@@ -1,7 +1,7 @@
 """LedFx API client exceptions."""
 
 
-class LedFxError(BaseException):
+class LedFxError(Exception):
     """LedFx error"""
 
 

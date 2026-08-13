@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import Enum, StrEnum
 
 
-class Method(str, Enum):
+class Method(StrEnum):
     """Method enum"""
 
     GET = "GET"
@@ -21,17 +21,21 @@ class Version(Enum):
     V2 = 2
 
 
-class ActionType(str, Enum):
+class ActionType(StrEnum):
     """ActionType enum"""
 
     DEFAULT = "default"
-    SCENE = "scene"
     DEVICE = "device"
+    DEVICE_PRESET = "device_preset"
+    DEVICE_EFFECT = "device_effect"
 
 
-class EffectCategory(str, Enum):
+class EffectCategory(StrEnum):
     """EffectCategory enum"""
 
     NONE = "none"
-    DEFAULT = "default_presets"
-    CUSTOM = "custom_presets"
+    # Sent on the wire as the `category` field of PUT /api/virtuals/{id}/presets.
+    # LedFx 2.x (verified against 2.1.9) only accepts "ledfx_presets"/"user_presets";
+    # the old "default_presets"/"custom_presets" values are rejected.
+    DEFAULT = "ledfx_presets"
+    CUSTOM = "user_presets"

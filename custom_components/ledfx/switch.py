@@ -5,7 +5,11 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from homeassistant.components.switch import ENTITY_ID_FORMAT, SwitchEntity
+from homeassistant.components.switch import (
+    ENTITY_ID_FORMAT,
+    SwitchEntity,
+    SwitchEntityDescription,
+)
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
@@ -31,27 +35,33 @@ PARALLEL_UPDATES = 0
 
 _LOGGER = logging.getLogger(__name__)
 
+PAUSE_SWITCH = SwitchEntityDescription(
+    key="pause",
+    name="Pause",
+    icon="mdi:pause-circle",
+)
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
     config_entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up LedFx number entry.
-
-    :param hass: HomeAssistant: Home Assistant object
-    :param config_entry: ConfigEntry: ConfigEntry object
-    :param async_add_entities: AddEntitiesCallback: AddEntitiesCallback callback object
-    """
+    """Set up LedFx switch entry."""
 
     updater: LedFxUpdater = async_get_updater(hass, config_entry.entry_id)
 
+    entities: list[SwitchEntity] = [
+        LedFxPauseSwitch(
+            f"{config_entry.entry_id}-{PAUSE_SWITCH.key}",
+            PAUSE_SWITCH,
+            updater,
+        )
+    ]
+
     @callback
     def add_switch(entity: LedFxEntityDescription) -> None:
-        """Add switch.
-
-        :param entity: LedFxEntityDescription: Sensor object
-        """
+        """Add effect-config switch."""
 
         async_add_entities(
             [
@@ -64,16 +74,68 @@ async def async_setup_entry(
         )
 
     for switch in updater.switches.values():
-        add_switch(switch)
+        entities.append(
+            LedFxSwitch(
+                f"{config_entry.entry_id}-{switch.device_code}-{switch.description.key}",
+                switch,
+                updater,
+            )
+        )
 
+    async_add_entities(entities)
     updater.new_switch_callback = async_dispatcher_connect(
         hass, SIGNAL_NEW_SWITCH, add_switch
     )
 
 
+class LedFxPauseSwitch(LedFxEntity, SwitchEntity):
+    """Switch reflecting whether LedFx output is paused."""
+
+    entity_description: SwitchEntityDescription
+
+    def __init__(
+        self,
+        unique_id: str,
+        description: SwitchEntityDescription,
+        updater: LedFxUpdater,
+    ) -> None:
+        super().__init__(unique_id, description, updater, ENTITY_ID_FORMAT)
+        self.entity_id = generate_entity_id(
+            ENTITY_ID_FORMAT,
+            updater.ip,
+            description.key,
+        )
+        self._attr_is_on = bool(updater.data.get("paused", False))
+
+    def _handle_coordinator_update(self) -> None:
+        is_on = bool(self._updater.data.get("paused", False))
+        is_available = bool(self._updater.data.get(ATTR_STATE, False))
+
+        if self._attr_is_on == is_on and self._attr_available == is_available:
+            return
+
+        self._attr_is_on = is_on
+        self._attr_available = is_available
+        self.async_write_ha_state()
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Pause LedFx if currently playing."""
+
+        if not self._updater.data.get("paused", False):
+            await self._updater.client.toggle_play_pause()
+            await self._updater.async_request_refresh()
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Resume LedFx if currently paused."""
+
+        if self._updater.data.get("paused", False):
+            await self._updater.client.toggle_play_pause()
+            await self._updater.async_request_refresh()
+
+
 # pylint: disable=too-many-ancestors
 class LedFxSwitch(LedFxEntity, SwitchEntity):
-    """LedFx switch entry."""
+    """LedFx effect-config switch entry."""
 
     _type: ActionType
 
@@ -83,12 +145,7 @@ class LedFxSwitch(LedFxEntity, SwitchEntity):
         entity: LedFxEntityDescription,
         updater: LedFxUpdater,
     ) -> None:
-        """Initialize switch.
-
-        :param unique_id: str: Unique ID
-        :param entity: LedFxEntityDescription object
-        :param updater: LedFxUpdater: Luci updater object
-        """
+        """Initialize switch."""
 
         LedFxEntity.__init__(
             self, unique_id, entity.description, updater, ENTITY_ID_FORMAT
@@ -96,7 +153,7 @@ class LedFxSwitch(LedFxEntity, SwitchEntity):
 
         self._type = entity.type
         self._attr_device_info = entity.device_info
-        self._attr_available: bool = True
+        self._attr_available = True
 
         self._attr_device_code = entity.device_code
 
@@ -157,18 +214,12 @@ class LedFxSwitch(LedFxEntity, SwitchEntity):
         self.async_write_ha_state()
 
     async def _device_toggle(self, state: bool) -> None:
-        """Device input
-
-        :param state: bool: State
-        """
+        """Device input."""
 
         await self.async_update_effect(self.entity_description.key, state)
 
     async def async_turn_on(self, **kwargs: Any) -> None:
-        """Set turn on
-
-        :param **kwargs: Any
-        """
+        """Turn the effect-config switch on."""
 
         if action := getattr(self, f"_{ActionType.DEVICE}_toggle"):
             await action(True)
@@ -178,10 +229,7 @@ class LedFxSwitch(LedFxEntity, SwitchEntity):
             self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
-        """Set turn off
-
-        :param **kwargs: Any
-        """
+        """Turn the effect-config switch off."""
 
         if action := getattr(self, f"_{ActionType.DEVICE}_toggle"):
             await action(False)
