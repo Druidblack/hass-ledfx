@@ -932,7 +932,11 @@ class LedFxUpdater(DataUpdateCoordinator):
                 },
                 name=device_config.get("name", code),
                 model=device_config.get("type"),
-                configuration_url=f"http://{self.address}/devices/{code}",
+                configuration_url=(
+                    f"http://{self.address}/#/device/{code}"
+                    if self.version == Version.V2
+                    else f"http://{self.address}/devices/{code}"
+                ),
             )
 
             self._prepare_device_fields(code, device_info)
